@@ -89,17 +89,48 @@
     });
     h += `<g class="train" id="train"><circle class="halo" r="17"/><circle class="core" r="10"/></g>`;
     svg.innerHTML = h;
-    fitMap();
+    bounds = null; boxes = null;
   }
-  // Fit the viewBox to the drawing (labels included) so the map fills its panel.
-  function fitMap() {
-    const svg = $("svg");
+  // ---------- camera: a zoomed-in, north-up view that follows the train ----------
+  // The zoom is set by label size: station names (LABEL_UNITS in map units) appear LABEL_PX tall on screen.
+  // Raise LABEL_PX to zoom in (fewer stations visible), lower it to zoom out.
+  const LABEL_UNITS = 24, LABEL_PX = 15;
+  // How far ahead the view looks, in stations. The train sits a little behind centre so you see what's coming.
+  const LOOK_AHEAD = 1.5;
+  let bounds = null, cam = null, boxes = null;
+  function measure() {
     try {
-      const b = svg.getBBox(), pad = 14;
-      if (b.width) svg.setAttribute("viewBox", `${b.x - pad} ${b.y - pad} ${b.width + pad * 2} ${b.height + pad * 2}`);
+      const b = $("svg").getBBox(), pad = 24;
+      if (b.width) bounds = { x: b.x - pad, y: b.y - pad, w: b.width + pad * 2, h: b.height + pad * 2 };
     } catch (e) {}
   }
-  document.fonts && document.fonts.ready.then(fitMap);
+  function clampAxis(c, size, lo, span) {
+    if (size >= span) return lo + span / 2;               // whole drawing fits: centre it
+    return Math.min(Math.max(c, lo + size / 2), lo + span - size / 2);
+  }
+  function aim(pos) {
+    const svg = $("svg"), r = svg.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    if (!bounds) measure();
+    const k = LABEL_PX / LABEL_UNITS, w = r.width / k, h = r.height / k;
+    // Centre on the box around the nearby stations (dots and their labels): the last stop,
+    // the train, and LOOK_AHEAD stations ahead, so the names you care about stay in view.
+    if (!boxes) boxes = stations.map((_, i) => { try { return [$("d" + i).getBBox(), $("l" + i).getBBox()]; } catch (e) { return null; } });
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (let i = Math.max(0, Math.floor(pos)); i <= Math.min(n - 1, Math.ceil(pos + LOOK_AHEAD)); i++) {
+      (boxes[i] || []).forEach(bb => { x0 = Math.min(x0, bb.x); y0 = Math.min(y0, bb.y); x1 = Math.max(x1, bb.x + bb.width); y1 = Math.max(y1, bb.y + bb.height); });
+    }
+    const t = xy(pos);
+    let cx = isFinite(x0) ? (x0 + x1) / 2 : t[0], cy = isFinite(y0) ? (y0 + y1) / 2 : t[1];
+    // If that box is wider than the view, keep the train itself comfortably inside.
+    cx = Math.min(Math.max(cx, t[0] - w / 2 + 40), t[0] + w / 2 - 40);
+    if (bounds) { cx = clampAxis(cx, w, bounds.x, bounds.w); cy = clampAxis(cy, h, bounds.y, bounds.h); }
+    // Ease toward the target; snap on big jumps (seeking, resizing).
+    if (!cam || Math.hypot(cx - cam.x, cy - cam.y) > 150 || Math.abs(w - cam.w) > 1) cam = { x: cx, y: cy, w };
+    else { cam.x += (cx - cam.x) * 0.12; cam.y += (cy - cam.y) * 0.12; }
+    svg.setAttribute("viewBox", `${(cam.x - w / 2).toFixed(1)} ${(cam.y - h / 2).toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}`);
+  }
+  document.fonts && document.fonts.ready.then(() => { bounds = null; boxes = null; cam = null; });
   function spentPoints(pos) {
     const pts = [];
     for (let i = 0; i <= Math.floor(pos); i++) pts.push(xy(i));
@@ -132,7 +163,7 @@
     else { E.textContent = "After"; H.textContent = stations[s.at].name; S.innerHTML = ""; }
 
     const stationNo = s.phase === "moving" ? s.next : Math.round(s.pos);
-    $("tStation").textContent = `${stationNo + 1} / ${n}`;
+    $("tStation").textContent = `${stationNo + 1}/${n}`;
     if (s.start != null) {
       $("tElapsed").textContent = fmt(Math.max(0, t - s.start));
       $("tRemainLbl").textContent = "To " + stations[s.endPos].name;
@@ -142,6 +173,7 @@
     }
     $("segbar").style.width = (s.segFrac || 0) * 100 + "%";
 
+    aim(s.pos);
     const [x, y] = xy(s.pos);
     $("spent").setAttribute("points", spentPoints(s.pos));
     const tr = $("train");
@@ -151,12 +183,11 @@
     for (let i = 0; i < n; i++) {
       const done = i < s.pos - 1e-6 && i !== here;
       $("d" + i).setAttribute("class", "dot" + (i === here ? " here" : done ? " done" : ""));
-      $("l" + i).setAttribute("class", "lbl" + (i === here ? " here" : (s.phase === "moving" && i === s.next) ? " next" : done ? " done" : ""));
+            $("l" + i).setAttribute("class", "lbl" + (i === here ? " here" : (s.phase === "moving" && i === s.next) ? " next" : done ? " done" : ""));
     }
     if (s.phase === "moving" || s.phase === "dwell" || s.phase === "before") document.title = `${H.textContent} · ${R.name}`;
     last = s;
   }
-  setInterval(render, 100);
 
   // ---------- adjustments ----------
   const showOffset = () => { $("offset").textContent = (offset > 0 ? "+" : "") + offset + "s"; };
@@ -211,5 +242,5 @@
   if (R.color) document.documentElement.style.setProperty("--line", R.color);
   showOffset();
   buildMap();
-  render();
+  (function loop() { render(); requestAnimationFrame(loop); })();
 })();
