@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cab Ride</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;800&family=Overpass+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="app">
+  <section class="screen">
+    <div class="frame"><div id="player"></div></div>
+  </section>
+
+  <aside class="side">
+    <header class="top">
+      <div class="route">
+        <span class="bullet" id="bullet"></span>
+        <div>
+          <div class="rname" id="routeName">Loading…</div>
+          <div class="rsub" id="routeSub"></div>
+        </div>
+      </div>
+      <button class="icon" id="fs" title="Full screen (F)" aria-label="Full screen">⛶</button>
+    </header>
+
+    <section class="status" aria-live="polite">
+      <div class="eyebrow" id="eyebrow">—</div>
+      <p class="headline" id="headline">—</p>
+      <div class="sub" id="sub"></div>
+      <div class="segbar"><i id="segbar"></i></div>
+    </section>
+
+    <div class="map"><svg id="svg" role="img" aria-label="Route map with the train's current position"></svg></div>
+
+    <section class="totals">
+      <div><span class="k">Station</span><b id="tStation">—</b></div>
+      <div><span class="k">Elapsed</span><b id="tElapsed">0:00</b></div>
+      <div><span class="k" id="tRemainLbl">Remaining</span><b id="tRemain">—</b></div>
+    </section>
+    <div class="overall"><i id="overall"></i></div>
+
+    <details class="adjust">
+      <summary>Adjust timing</summary>
+      <div class="inner">
+        <div class="row">
+          <span class="k">Map offset</span>
+          <button data-off="-1">−1s</button>
+          <b class="mono" id="offset">0s</b>
+          <button data-off="1">+1s</button>
+          <button id="offReset">Reset</button>
+        </div>
+        <p class="hint">If the map runs ahead of the video, subtract time; if it lags, add time.</p>
+        <div class="row">
+          <button class="mark" id="mark">Set arrival here</button>
+          <button class="mark" id="markDep">Set departure here</button>
+        </div>
+        <p class="hint">Fixes the nearest stop's time using the video's current position. Changes are saved in this browser.</p>
+        <div class="row"><button class="danger" id="resetTimes">Restore original times</button><span class="hint" id="msg"></span></div>
+      </div>
+    </details>
+    <footer class="credit"><span id="credit"></span> · <span id="clock" class="mono">0:00</span></footer>
+  </aside>
+</main>
+
+<script src="routes.js"></script>
+<script src="app.js"></script>
+<script src="https://www.youtube.com/iframe_api"></script>
+</body>
+</html>
